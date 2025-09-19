@@ -1,0 +1,436 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import ProtectedRoute from '@/components/ProtectedRoute';
+import Navigation from '@/components/Navigation';
+import { getJournalEntriesForAnalytics } from '@/lib/database';
+import { JournalEntryWithPlanets } from '@/types/database';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  ScatterChart,
+  Scatter
+} from 'recharts';
+import { format, subDays, startOfMonth } from 'date-fns';
+import {
+  ChartBarIcon,
+  CalendarIcon,
+  MoonIcon,
+  SunIcon
+} from '@heroicons/react/24/outline';
+import PlanetaryWidget from '@/components/PlanetaryWidget';
+
+export default function AnalyticsPage() {
+  const [entries, setEntries] = useState<JournalEntryWithPlanets[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dateRange, setDateRange] = useState('30'); // days
+
+  useEffect(() => {
+    const fetchAnalyticsData = async () => {
+      setLoading(true);
+      try {
+        let startDate = '';
+        const endDate = format(new Date(), 'yyyy-MM-dd');
+        
+        switch (dateRange) {
+          case '7':
+            startDate = format(subDays(new Date(), 7), 'yyyy-MM-dd');
+            break;
+          case '30':
+            startDate = format(subDays(new Date(), 30), 'yyyy-MM-dd');
+            break;
+          case '90':
+            startDate = format(subDays(new Date(), 90), 'yyyy-MM-dd');
+            break;
+          case 'month':
+            startDate = format(startOfMonth(new Date()), 'yyyy-MM-dd');
+            break;
+          default:
+            startDate = '';
+        }
+
+        const data = await getJournalEntriesForAnalytics(startDate || undefined, endDate);
+        setEntries(data);
+      } catch (error) {
+        console.error('Error fetching analytics data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAnalyticsData();
+  }, [dateRange]);
+
+  // Prepare data for charts
+  const prepareTimeSeriesData = () => {
+    return entries
+      .filter(entry => entry.mood_score && entry.sleep_duration)
+      .map(entry => {
+        const moonPlanet = entry.planetary_data?.find(p => p.name === 'Moon');
+        const moonPhase = moonPlanet ? getMoonPhase(moonPlanet.longitude) : 'Unknown';
+        
+        return {
+          date: format(new Date(entry.date), 'MMM d'),
+          mood: entry.mood_score,
+          sleep: entry.sleep_duration,
+          moonPhase,
+          moonRasi: moonPlanet?.rasi.name || 'Unknown',
+          disturbances: entry.disturbances ? 1 : 0
+        };
+      })
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  };
+
+  const prepareMoonPhaseData = () => {
+    const phaseGroups = entries.reduce((acc, entry) => {
+      if (!entry.mood_score || !entry.planetary_data) return acc;
+      
+      const moonPlanet = entry.planetary_data.find(p => p.name === 'Moon');
+      if (!moonPlanet) return acc;
+      
+      const phase = getMoonPhase(moonPlanet.longitude);
+      if (!acc[phase]) {
+        acc[phase] = { phase, totalMood: 0, totalSleep: 0, count: 0 };
+      }
+      
+      acc[phase].totalMood += entry.mood_score;
+      acc[phase].totalSleep += entry.sleep_duration || 0;
+      acc[phase].count += 1;
+      
+      return acc;
+    }, {} as Record<string, { phase: string; totalMood: number; totalSleep: number; count: number }>);
+
+    return Object.values(phaseGroups).map((group) => ({
+      phase: group.phase,
+      avgMood: group.totalMood / group.count,
+      avgSleep: group.totalSleep / group.count,
+      count: group.count
+    }));
+  };
+
+  const prepareRasiData = () => {
+    const rasiGroups = entries.reduce((acc, entry) => {
+      if (!entry.mood_score || !entry.planetary_data) return acc;
+      
+      const moonPlanet = entry.planetary_data.find(p => p.name === 'Moon');
+      if (!moonPlanet) return acc;
+      
+      const rasi = moonPlanet.rasi.name;
+      if (!acc[rasi]) {
+        acc[rasi] = { rasi, totalMood: 0, count: 0 };
+      }
+      
+      acc[rasi].totalMood += entry.mood_score;
+      acc[rasi].count += 1;
+      
+      return acc;
+    }, {} as Record<string, { rasi: string; totalMood: number; count: number }>);
+
+    return Object.values(rasiGroups)
+      .map((group) => ({
+        rasi: group.rasi,
+        avgMood: group.totalMood / group.count,
+        count: group.count
+      }))
+      .sort((a, b) => b.avgMood - a.avgMood);
+  };
+
+  const getMoonPhase = (longitude: number) => {
+    if (longitude >= 0 && longitude < 90) return 'New Moon';
+    if (longitude >= 90 && longitude < 180) return 'First Quarter';
+    if (longitude >= 180 && longitude < 270) return 'Full Moon';
+    return 'Last Quarter';
+  };
+
+  const timeSeriesData = prepareTimeSeriesData();
+  const moonPhaseData = prepareMoonPhaseData();
+  const rasiData = prepareRasiData();
+
+  return (
+    <ProtectedRoute>
+      <div className="min-h-screen bg-gray-50">
+        <Navigation />
+        
+        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+          <div className="px-4 py-6 sm:px-0">
+            <div className="mb-8 flex justify-between items-center">
+              <div>
+                <h1 className="text-3xl font-bold text-black">Analytics Dashboard</h1>
+                <p className="mt-2 text-gray-700">
+                  Discover correlations between your experiences and planetary positions.
+                </p>
+              </div>
+              
+              {/* Date Range Selector */}
+              <div className="flex items-center space-x-4">
+                <select
+                  value={dateRange}
+                  onChange={(e) => setDateRange(e.target.value)}
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm text-black"
+                >
+                  <option value="7">Last 7 days</option>
+                  <option value="30">Last 30 days</option>
+                  <option value="90">Last 90 days</option>
+                  <option value="month">This month</option>
+                  <option value="all">All time</option>
+                </select>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="flex justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+              </div>
+            ) : entries.length === 0 ? (
+              <div className="text-center py-12">
+                <ChartBarIcon className="mx-auto h-12 w-12 text-gray-400" />
+                <h3 className="mt-2 text-sm font-medium text-black">No data available</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Create some journal entries to see analytics and correlations.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-8">
+                {/* Today's Planetary Positions and Summary Stats */}
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                  <div className="lg:col-span-3">
+                    {/* Summary Stats */}
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+                      <div className="bg-white overflow-hidden shadow rounded-lg">
+                        <div className="p-5">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0">
+                              <CalendarIcon className="h-6 w-6 text-gray-400" />
+                            </div>
+                            <div className="ml-5 w-0 flex-1">
+                              <dl>
+                                <dt className="text-sm font-medium text-gray-500 truncate">
+                                  Total Entries
+                                </dt>
+                                <dd className="text-lg font-medium text-black">
+                                  {entries.length}
+                                </dd>
+                              </dl>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-white overflow-hidden shadow rounded-lg">
+                        <div className="p-5">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0">
+                              <SunIcon className="h-6 w-6 text-yellow-400" />
+                            </div>
+                            <div className="ml-5 w-0 flex-1">
+                              <dl>
+                                <dt className="text-sm font-medium text-gray-500 truncate">
+                                  Average Mood
+                                </dt>
+                                <dd className="text-lg font-medium text-black">
+                                  {entries.length > 0 
+                                    ? (entries.reduce((sum, e) => sum + (e.mood_score || 0), 0) / entries.filter(e => e.mood_score).length).toFixed(1)
+                                    : '0'
+                                  }/10
+                                </dd>
+                              </dl>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-white overflow-hidden shadow rounded-lg">
+                        <div className="p-5">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0">
+                              <MoonIcon className="h-6 w-6 text-blue-400" />
+                            </div>
+                            <div className="ml-5 w-0 flex-1">
+                              <dl>
+                                <dt className="text-sm font-medium text-gray-500 truncate">
+                                  Average Sleep
+                                </dt>
+                                <dd className="text-lg font-medium text-black">
+                                  {entries.length > 0 
+                                    ? (entries.reduce((sum, e) => sum + (e.sleep_duration || 0), 0) / entries.filter(e => e.sleep_duration).length).toFixed(1)
+                                    : '0'
+                                  }h
+                                </dd>
+                              </dl>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Planetary Widget */}
+                  <div className="lg:col-span-1">
+                    <PlanetaryWidget compact={true} />
+                  </div>
+                </div>
+
+                {/* Time Series Chart */}
+                {timeSeriesData.length > 0 && (
+                  <div className="bg-white shadow rounded-lg p-6">
+                    <h3 className="text-lg font-medium text-black mb-4">
+                      Mood & Sleep Over Time
+                    </h3>
+                    <div className="h-80">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={timeSeriesData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="date" />
+                          <YAxis />
+                          <Tooltip />
+                          <Legend />
+                          <Line 
+                            type="monotone" 
+                            dataKey="mood" 
+                            stroke="#8884d8" 
+                            strokeWidth={2}
+                            name="Mood Score"
+                          />
+                          <Line 
+                            type="monotone" 
+                            dataKey="sleep" 
+                            stroke="#82ca9d" 
+                            strokeWidth={2}
+                            name="Sleep Hours"
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Moon Phase Analysis */}
+                  {moonPhaseData.length > 0 && (
+                    <div className="bg-white shadow rounded-lg p-6">
+                      <h3 className="text-lg font-medium text-black mb-4">
+                        Mood by Moon Phase
+                      </h3>
+                      <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={moonPhaseData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="phase" />
+                            <YAxis />
+                            <Tooltip />
+                            <Bar dataKey="avgMood" fill="#8884d8" name="Average Mood" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Rasi Analysis */}
+                  {rasiData.length > 0 && (
+                    <div className="bg-white shadow rounded-lg p-6">
+                      <h3 className="text-lg font-medium text-black mb-4">
+                        Mood by Moon Rasi
+                      </h3>
+                      <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={rasiData.slice(0, 6)}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="rasi" />
+                            <YAxis />
+                            <Tooltip />
+                            <Bar dataKey="avgMood" fill="#82ca9d" name="Average Mood" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Correlation Scatter Plot */}
+                {timeSeriesData.length > 0 && (
+                  <div className="bg-white shadow rounded-lg p-6">
+                    <h3 className="text-lg font-medium text-black mb-4">
+                      Sleep vs Mood Correlation
+                    </h3>
+                    <div className="h-80">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ScatterChart data={timeSeriesData}>
+                          <CartesianGrid />
+                          <XAxis 
+                            type="number" 
+                            dataKey="sleep" 
+                            name="Sleep Hours"
+                            domain={[0, 12]}
+                          />
+                          <YAxis 
+                            type="number" 
+                            dataKey="mood" 
+                            name="Mood Score"
+                            domain={[1, 10]}
+                          />
+                          <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+                          <Scatter 
+                            name="Entries" 
+                            dataKey="mood" 
+                            fill="#8884d8"
+                          />
+                        </ScatterChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                )}
+
+                {/* Insights Section */}
+                <div className="bg-white shadow rounded-lg p-6">
+                  <h3 className="text-lg font-medium text-black mb-4">
+                    Key Insights
+                  </h3>
+                  <div className="space-y-3 text-sm text-gray-600">
+                    {moonPhaseData.length > 0 && (
+                      <div className="p-3 bg-blue-50 rounded-md">
+                        <p className="font-medium text-blue-800">
+                          Best Moon Phase for Mood: {moonPhaseData.sort((a, b) => b.avgMood - a.avgMood)[0]?.phase}
+                        </p>
+                        <p className="text-blue-600">
+                          Average mood score: {moonPhaseData.sort((a, b) => b.avgMood - a.avgMood)[0]?.avgMood.toFixed(1)}/10
+                        </p>
+                      </div>
+                    )}
+                    
+                    {rasiData.length > 0 && (
+                      <div className="p-3 bg-green-50 rounded-md">
+                        <p className="font-medium text-green-800">
+                          Best Moon Rasi for Mood: {rasiData[0]?.rasi}
+                        </p>
+                        <p className="text-green-600">
+                          Average mood score: {rasiData[0]?.avgMood.toFixed(1)}/10
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="p-3 bg-yellow-50 rounded-md">
+                      <p className="font-medium text-yellow-800">
+                        Sleep Disturbances: {entries.filter(e => e.disturbances).length} out of {entries.length} entries
+                      </p>
+                      <p className="text-yellow-600">
+                        {entries.length > 0 ? ((entries.filter(e => e.disturbances).length / entries.length) * 100).toFixed(1) : 0}% of your recorded days
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
+    </ProtectedRoute>
+  );
+}

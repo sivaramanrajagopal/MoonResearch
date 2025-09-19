@@ -10,6 +10,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-tamil: var(--font-tamil);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -22,5 +23,210 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Tamil font support */
+.font-tamil {
+  font-family: var(--font-tamil), sans-serif;
+}
+
+/* Tamil text styling */
+.tamil-text {
+  font-family: var(--font-tamil), sans-serif;
+  font-weight: 500;
+}
+
+/* Ensure proper rendering for Tamil text */
+body[data-language="ta"] {
+  font-family: var(--font-tamil), var(--font-geist-sans), sans-serif;
+}
+
+/* Improve Tamil text readability */
+.tamil-content {
+  font-family: var(--font-tamil), sans-serif;
+  line-height: 1.6;
+  letter-spacing: 0.02em;
+}
+
+/* Planet names in Tamil */
+.planet-name-tamil {
+  font-family: var(--font-tamil), sans-serif;
+  font-weight: 600;
+  font-size: 0.95em;
+  color: #000000 !important;
+}
+
+/* Enhanced planetary positions styling */
+.planetary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.planet-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.planet-card:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+.planet-name {
+  font-weight: 600;
+  color: #000000 !important;
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+}
+
+.planet-rasi {
+  color: #374151 !important;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.planet-degree {
+  color: #6b7280;
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+/* Ensure all text is visible and black */
+.text-black-important {
+  color: #000000 !important;
+}
+
+.text-dark-important {
+  color: #1f2937 !important;
+}
+
+/* Force black text for all important elements */
+h1, h2, h3, h4, h5, h6 {
+  color: #000000 !important;
+}
+
+.text-gray-900 {
+  color: #000000 !important;
+}
+
+.text-gray-800 {
+  color: #1f2937 !important;
+}
+
+.text-gray-700 {
+  color: #374151 !important;
+}
+
+/* Ensure labels and values are always visible */
+label {
+  color: #000000 !important;
+  font-weight: 600 !important;
+}
+
+input, select, textarea {
+  color: #000000 !important;
+}
+
+/* Navigation text */
+nav a, nav button, nav span {
+  color: #374151 !important;
+}
+
+nav a:hover, nav button:hover {
+  color: #000000 !important;
+}
+
+/* Card content */
+.bg-white p, .bg-white span, .bg-white div {
+  color: #1f2937 !important;
+}
+
+/* Table content */
+table th, table td {
+  color: #000000 !important;
+}
+
+/* Mobile-first responsive design improvements */
+@media (max-width: 768px) {
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  .grid-mobile-friendly {
+    grid-template-columns: 1fr;
+  }
+  
+  .text-mobile {
+    font-size: 0.875rem;
+    line-height: 1.4;
+  }
+  
+  .planet-grid-mobile {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+  }
+  
+  .form-mobile {
+    padding: 1rem;
+  }
+  
+  .card-mobile {
+    margin-bottom: 1rem;
+    padding: 1rem;
+  }
+}
+
+/* Ensure planetary widgets are mobile-friendly */
+.planetary-widget {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.planetary-grid-responsive {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  min-width: 100%;
+}
+
+@media (min-width: 640px) {
+  .planetary-grid-responsive {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .planetary-grid-responsive {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+}
+
+/* Mobile-friendly form styling */
+.form-container-mobile {
+  max-width: 100%;
+  padding: 1rem;
+}
+
+@media (min-width: 640px) {
+  .form-container-mobile {
+    max-width: 42rem;
+    padding: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .form-container-mobile {
+    max-width: 56rem;
+    padding: 2rem;
+  }
 }
