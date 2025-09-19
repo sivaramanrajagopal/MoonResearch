@@ -10,7 +10,12 @@ const ADMIN_EMAILS = [
 // Check if user is admin
 export const isUserAdmin = (userEmail: string | undefined): boolean => {
   if (!userEmail) return false;
-  return ADMIN_EMAILS.includes(userEmail.toLowerCase());
+  
+  // For production, also check environment variable
+  const envAdmins = process.env.ADMIN_EMAILS?.split(',').map(email => email.trim().toLowerCase()) || [];
+  const allAdmins = [...ADMIN_EMAILS.map(email => email.toLowerCase()), ...envAdmins];
+  
+  return allAdmins.includes(userEmail.toLowerCase());
 };
 
 // Input sanitization
